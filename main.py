@@ -104,7 +104,8 @@ async def rag_query_pdf_ai(ctx: inngest.Context):
                 "role": "user",
                 "content": user_content
             }
-        ]
+        ],
+        # keep_alive="30m",
     )
 
         return response["message"]["content"].strip()

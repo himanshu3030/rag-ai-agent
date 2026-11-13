@@ -10,3 +10,7 @@ wheels/
 .venv
 
 .env
+
+# Uploaded PDFs and local vector data
+uploads/
+qdrant_storage/

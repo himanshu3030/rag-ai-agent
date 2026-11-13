@@ -191,13 +191,70 @@ def extract_rag_output(value: Any) -> dict | None:
 # Wait for Inngest function completion
 # --------------------------------------------------
 
+# def wait_for_run_output(
+#     event_id: str,
+#     timeout_s: float = 180,
+#     poll_interval_s: float = 1,
+# ) -> dict:
+
+#     start_time = time.time()
+#     last_status = None
+#     last_run = None
+
+#     while time.time() - start_time < timeout_s:
+
+#         runs = fetch_runs(event_id)
+
+#         if runs:
+#             run = runs[0]
+#             last_run = run
+
+#             status = str(run.get("status", "")).lower()
+#             last_status = status or last_status
+
+#             if status in (
+#                 "completed",
+#                 "succeeded",
+#                 "success",
+#                 "finished",
+#             ):
+
+#                 output = extract_rag_output(run)
+
+#                 if output is not None:
+#                     return output
+
+#                 # Preserve the raw response for troubleshooting
+#                 raise RuntimeError(
+#                     "Inngest completed the function, but its API "
+#                     "response did not contain an answer field.\n\n"
+#                     f"Run response:\n{json.dumps(run, indent=2, default=str)}"
+#                 )
+
+#             if status in ("failed", "cancelled"):
+#                 raise RuntimeError(
+#                     f"Inngest function {status}.\n"
+#                     f"{json.dumps(run, indent=2, default=str)}"
+#                 )
+
+#         time.sleep(poll_interval_s)
+
+#     raise TimeoutError(
+#         f"Timed out waiting for Inngest.\n"
+#         f"Last status: {last_status}\n"
+#         f"Last run: {last_run}"
+#     )
+
+
 def wait_for_run_output(
     event_id: str,
     timeout_s: float = 180,
     poll_interval_s: float = 1,
+    output_grace_s: float = 15,
 ) -> dict:
 
     start_time = time.time()
+    completed_at = None
     last_status = None
     last_run = None
 
@@ -212,26 +269,26 @@ def wait_for_run_output(
             status = str(run.get("status", "")).lower()
             last_status = status or last_status
 
-            if status in (
-                "completed",
-                "succeeded",
-                "success",
-                "finished",
-            ):
+            if status in ("completed", "succeeded", "success", "finished"):
 
                 output = extract_rag_output(run)
 
                 if output is not None:
                     return output
 
-                # Preserve the raw response for troubleshooting
-                raise RuntimeError(
-                    "Inngest completed the function, but its API "
-                    "response did not contain an answer field.\n\n"
-                    f"Run response:\n{json.dumps(run, indent=2, default=str)}"
-                )
+                # Completed, but the output isn't attached yet.
+                # Keep polling for a short grace period.
+                if completed_at is None:
+                    completed_at = time.time()
 
-            if status in ("failed", "cancelled"):
+                if time.time() - completed_at > output_grace_s:
+                    raise RuntimeError(
+                        "Inngest completed the function, but its API "
+                        "response did not contain an answer field.\n\n"
+                        f"Run response:\n{json.dumps(run, indent=2, default=str)}"
+                    )
+
+            elif status in ("failed", "cancelled"):
                 raise RuntimeError(
                     f"Inngest function {status}.\n"
                     f"{json.dumps(run, indent=2, default=str)}"
@@ -244,7 +301,6 @@ def wait_for_run_output(
         f"Last status: {last_status}\n"
         f"Last run: {last_run}"
     )
-
 
 # --------------------------------------------------
 # Streamlit UI - PDF ingestion
