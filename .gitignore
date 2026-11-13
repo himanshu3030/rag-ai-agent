@@ -10,6 +10,8 @@ wheels/
 .venv
 
 .env
+.env.*
+!.env.example
 
 # Uploaded PDFs and local vector data
 uploads/
